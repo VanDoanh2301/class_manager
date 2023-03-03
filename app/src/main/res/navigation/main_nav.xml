@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_nav"
+    app:startDestination="@id/splashFragment">
+
+    <fragment
+        android:id="@+id/splashFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.SplashFragment"
+        android:label="fragment_splash"
+        tools:layout="@layout/fragment_splash" >
+        <action
+            android:id="@+id/action_splashFragment_to_classFragment"
+            app:destination="@id/classFragment"
+            app:enterAnim="@anim/from_right"
+            app:exitAnim="@anim/to_left"
+            app:popEnterAnim="@anim/from_left"
+            app:popExitAnim="@anim/to_right"/>
+    </fragment>
+    <fragment
+        android:id="@+id/classFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.ClassFragment"
+        android:label="fragment_class"
+        tools:layout="@layout/fragment_class" >
+        <action
+            android:id="@+id/action_classFragment_to_studentFragment"
+            app:destination="@id/studentFragment"
+            app:enterAnim="@anim/from_right"
+            app:exitAnim="@anim/to_left"
+            app:popEnterAnim="@anim/from_left"
+            app:popExitAnim="@anim/to_right" />
+        <action
+            android:id="@+id/action_classFragment_to_mapFragment"
+            app:destination="@id/mapFragment"
+            app:enterAnim="@anim/from_right"
+            app:exitAnim="@anim/to_left"
+            app:popEnterAnim="@anim/from_left"
+            app:popExitAnim="@anim/to_right"/>
+    </fragment>
+    <fragment
+        android:id="@+id/studentFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.StudentFragment"
+        android:label="fragment_student"
+        tools:layout="@layout/fragment_student" >
+        <action
+            android:id="@+id/action_studentFragment_to_sheetListFragment"
+            app:destination="@id/sheetListFragment"
+            app:enterAnim="@anim/from_right"
+            app:exitAnim="@anim/to_left"
+            app:popEnterAnim="@anim/from_left"
+            app:popExitAnim="@anim/to_right"/>
+        <action
+            android:id="@+id/action_studentFragment_to_contactFragment"
+            app:destination="@id/contactFragment"
+            app:enterAnim="@anim/from_right"
+            app:exitAnim="@anim/to_left"
+            app:popEnterAnim="@anim/from_left"
+            app:popExitAnim="@anim/to_right"/>
+    </fragment>
+    <fragment
+        android:id="@+id/sheetListFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.SheetListFragment"
+        android:label="fragment_sheet_list"
+        tools:layout="@layout/fragment_sheet_list" >
+        <action
+            android:id="@+id/action_sheetListFragment_to_sheetFragment"
+            app:destination="@id/sheetFragment"
+            app:enterAnim="@anim/from_right"
+            app:exitAnim="@anim/to_left"
+            app:popEnterAnim="@anim/from_left"
+            app:popExitAnim="@anim/to_right"/>
+    </fragment>
+    <fragment
+        android:id="@+id/sheetFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.SheetFragment"
+        android:label="fragment_sheet"
+        tools:layout="@layout/fragment_sheet" />
+    <fragment
+        android:id="@+id/contactFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.ContactFragment"
+        android:label="fragment_contact"
+        tools:layout="@layout/fragment_contact" />
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.MapFragment"
+        android:label="fragment_map"
+        tools:layout="@layout/fragment_map" />
+
+</navigation>
