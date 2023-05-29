@@ -15,11 +15,11 @@ class ClassAdapter(val classItems: ArrayList<ClassItem>) :
     RecyclerView.Adapter<ClassAdapter.ClassViewHolder>() {
     //PagingDataAdapter<ClassItem,ClassAdapter.ClassViewHolder>(CLASS_COMPARATOR) {
 
-    private val onItemClickListener: OnItemClickListener? = null
+    /*private val onItemClickListener: OnItemClickListener? = null
 
     interface OnItemClickListener {
         fun onItemClick(classItem: ClassItem)
-    }
+    }*/
 
     var onItemClick: ((Int) -> Unit)? = null
     var onMapClick: ((Int) -> Unit)? = null
