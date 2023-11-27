@@ -86,5 +86,10 @@
         android:name="com.ngxqt.classmanagementmvvm.ui.fragment.MapFragment"
         android:label="fragment_map"
         tools:layout="@layout/fragment_map" />
+    <fragment
+        android:id="@+id/blankFragment"
+        android:name="com.ngxqt.classmanagementmvvm.BlankFragment"
+        android:label="fragment_blank"
+        tools:layout="@layout/fragment_blank" />
 
 </navigation>

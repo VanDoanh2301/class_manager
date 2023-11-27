@@ -1,5 +1,6 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -8,23 +9,26 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.annotation.RequiresApi
 import androidx.core.os.bundleOf
-import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.*
 import com.ngxqt.classmanagementmvvm.R
 import com.ngxqt.classmanagementmvvm.data.model.ClassItem
+import com.ngxqt.classmanagementmvvm.data.model.StudentItem
 import com.ngxqt.classmanagementmvvm.databinding.FragmentClassBinding
 import com.ngxqt.classmanagementmvvm.databinding.ToolbarBinding
 import com.ngxqt.classmanagementmvvm.ui.adapter.ClassAdapter
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyCalendar
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyDialog
-import com.ngxqt.classmanagementmvvm.utils.DbHelper
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalTime
 
 @AndroidEntryPoint
 class ClassFragment : Fragment() {
@@ -32,7 +36,9 @@ class ClassFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var toolbarBinding: ToolbarBinding
     private lateinit var calendar: MyCalendar
-    private lateinit var dbHelper: DbHelper
+    private lateinit var databaseReference: DatabaseReference
+    private lateinit var auth: FirebaseAuth
+
     private lateinit var classAdapter: ClassAdapter
     private val classItems: ArrayList<ClassItem> = ArrayList()
 
@@ -48,13 +54,14 @@ class ClassFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         calendar = MyCalendar()
-        dbHelper = DbHelper(requireContext())
+        auth = FirebaseAuth.getInstance()
+        databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+
 
         binding.fabMain.setOnClickListener { showDialog() }
         setToolbar()
         loadData()
 
-        /**Cài đặt RecyclerView và Adapter để hiển thị item*/
         val recyclerView = binding.recyclerView
         val layoutManager = LinearLayoutManager(requireContext())
         recyclerView.layoutManager = layoutManager
@@ -69,60 +76,65 @@ class ClassFragment : Fragment() {
             gotoMapFragment(it)
         }
 
-        addDefaultClass("Lập Trình Ứng Dụng Di Động","ET4710 - 137364")
 
-        //Chặn Back
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             requireActivity().finishAffinity()
         }
     }
 
-    /**Load data Class từ Database*/
     private fun loadData() {
-        val cursor = dbHelper.getClassTabale()
+        databaseReference.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                classItems.clear()
+                for (postSnapshot in dataSnapshot.children) {
+                    val classItem = postSnapshot.getValue(ClassItem::class.java)
+                    if (classItem == null) {
+                        addDefaultClass("Lập Trình Ứng Dụng Di Động", "ET4710")
+                    } else {
+                        classItem?.let { classItems.add(it) }
+                    }
+                }
+                classAdapter.notifyDataSetChanged()
+            }
 
-        classItems.clear()
-        while (cursor.moveToNext()){
-            val cid = cursor.getLong(cursor.getColumnIndex(DbHelper.C_ID))
-            val className = cursor.getString(cursor.getColumnIndex(DbHelper.CLASS_NAME_KEY))
-            val subjectName = cursor.getString(cursor.getColumnIndex(DbHelper.SUBJECT_NAME_KEY))
-
-            classItems.add(ClassItem(cid,className,subjectName))
-        }
+            override fun onCancelled(databaseError: DatabaseError) {
+                Log.w("Firebase", "loadPost:onCancelled", databaseError.toException())
+            }
+        })
     }
 
-    /**Hiển thị Toolbar*/
     private fun setToolbar() {
         toolbarBinding = binding.toolbarMain
         toolbarBinding.apply {
-            titleToolbar.setText("Class Management App")
-            subtitleToolbar.setText("Class List")
+            titleToolbar.text = "Class Management App"
+            subtitleToolbar.text = "Class List"
             back.isInvisible = true
             save.isInvisible = true
         }
     }
 
     private fun gotoStudentFragment(position: Int) {
+        val idClass = databaseReference.push().key
         val bundle = bundleOf(
-            "className" to classItems.get(position).className,
-            "subjectName" to classItems.get(position).subjectName,
+            "className" to classItems[position].className,
+            "subjectName" to classItems[position].subjectName,
             "position" to position,
-            "cid" to classItems.get(position).cid
+            "cid" to classItems[position].cid,
+            "keyCid" to classItems[position].cid
         )
-        findNavController().navigate(R.id.action_classFragment_to_studentFragment,bundle)
+        findNavController().navigate(R.id.action_classFragment_to_studentFragment, bundle)
     }
 
     private fun gotoMapFragment(position: Int) {
         val bundle = bundleOf(
-            "className" to classItems.get(position).className,
-            "subjectName" to classItems.get(position).subjectName,
+            "className" to classItems[position].className,
+            "subjectName" to classItems[position].subjectName,
             "position" to position,
-            "cid" to classItems.get(position).cid
+            "cid" to classItems[position].cid
         )
-        findNavController().navigate(R.id.action_classFragment_to_mapFragment,bundle)
+        findNavController().navigate(R.id.action_classFragment_to_mapFragment, bundle)
     }
 
-    /**Hiển thị Dialog Add New Class*/
     private fun showDialog() {
         val dialog = MyDialog()
         dialog.show(parentFragmentManager, MyDialog.CLASS_AND_DIALOG)
@@ -132,27 +144,23 @@ class ClassFragment : Fragment() {
     }
 
     private fun addClass(className: String, subjectName: String) {
-        val cid = dbHelper.addClass(className,subjectName)
-        val classItem = ClassItem(cid,className,subjectName)
-        classItems.add(classItem)
-        classAdapter.notifyDataSetChanged()
-        Toast.makeText(requireContext(),"Add Success",Toast.LENGTH_SHORT).show()
+        val cid = subjectName
+        val classItem = ClassItem(cid, className, subjectName)
+        databaseReference.child(cid!!).setValue(classItem)
+        Toast.makeText(requireContext(), "Add Success", Toast.LENGTH_SHORT).show()
     }
 
-    /**Đặt giá trị mặc định cho danh sách Class*/
     private fun addDefaultClass(className: String, subjectName: String) {
-        val cursor = dbHelper.getClassTabale()
-        if (cursor.count == 0){
-            val cid = dbHelper.addClass(className,subjectName)
-            val classItem = ClassItem(cid,className,subjectName)
-            classItems.add(classItem)
-            classAdapter.notifyDataSetChanged()
+
+        if (classItems.isEmpty()) {
+            val cid = databaseReference.push().key
+            val classItem = ClassItem(cid, className, subjectName, false)
+            databaseReference.child(cid!!).setValue(classItem)
             readDataJson(cid)
         }
-        cursor.close()
     }
 
-    private fun readDataJson(cid: Long) {
+    private fun readDataJson(cid: String) {
         val defaultIdList = mutableListOf<Int>()
         val defaultNameList = mutableListOf<String>()
 
@@ -175,27 +183,32 @@ class ClassFragment : Fragment() {
         addDefaultStudent(defaultIdList,defaultNameList,cid)
     }
 
-    /**Đặt giá trị mặc định cho danh sách Student*/
-    private fun addDefaultStudent(defaultId: MutableList<Int>, defaultName: MutableList<String>, cid: Long) {
-        val cursor = dbHelper.getStudentTabale(cid!!)
-        //studentItems.clear()
-        if (cursor.count == 0){
-            for (i in 0..defaultId.size-1){
-                val roll = defaultId[i]
-                val name = defaultName[i]
-                Log.i("LOG_DEFAUL", i.toString()+" "+roll.toString()+" "+i.toString()+" "+name)
-                val sid = dbHelper.addStudent(cid!!,roll,name)
-                dbHelper.addStatus(sid,cid!!,calendar.getDate(),"P")
+    private fun addDefaultStudent(defaultId: MutableList<Int>, defaultName: MutableList<String>, cid: String) {
+        val studentsRef = databaseReference.child(cid).child("students")
+
+        studentsRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                if (!dataSnapshot.exists()) {
+                    for (i in 0 until defaultId.size) {
+                        val roll = defaultId[i]
+                        val name = defaultName[i]
+                        val newStudentRef = studentsRef.push()
+                        val studentItem = StudentItem(newStudentRef.key, roll, name, "P")
+                        newStudentRef.setValue(studentItem)
+                    }
+                }
             }
-        }
-        cursor.close()
+
+            override fun onCancelled(databaseError: DatabaseError) {
+                Log.w("Firebase", "loadPost:onCancelled", databaseError.toException())
+            }
+        })
     }
 
-    /**Bấm giữ item để Delete hoặc Update Class*/
     override fun onContextItemSelected(item: MenuItem): Boolean {
-        when(item.itemId){
+        when (item.itemId) {
             0 -> showUpdateDialog(item.groupId)
-            1 -> showComfirmDialog(item.groupId)
+            1 -> showConfirmDialog(item.groupId)
         }
         return super.onContextItemSelected(item)
     }
@@ -203,32 +216,53 @@ class ClassFragment : Fragment() {
     private fun showUpdateDialog(position: Int) {
         val dialog = MyDialog()
         dialog.show(parentFragmentManager, MyDialog.CLASS_UPDATE_DIALOG)
-        dialog.onItemClassClick = {
-            updateClass(position,it.className,it.subjectName)
-        }
+        dialog.onItemClassClick = { updateClass(position, it.className, it.subjectName) }
     }
 
-    private fun updateClass(position: Int,className: String, subjectName: String) {
-        dbHelper.updateClass(classItems.get(position).cid!!,className,subjectName)
-        classItems.get(position).className = className
-        classItems.get(position).subjectName = subjectName
-        classAdapter.notifyItemChanged(position)
-        Toast.makeText(requireContext(),"Update Success",Toast.LENGTH_SHORT).show()
+    private fun updateClass(position: Int, className: String, subjectName: String) {
+        val classId = classItems[position].cid ?: return // Ensure classId is not null
+        val classRef = databaseReference.child(classId)
+
+        val updatedClassItem = ClassItem(classId, className, subjectName)
+        classRef.setValue(updatedClassItem)
+            .addOnSuccessListener {
+                classItems[position] = updatedClassItem
+                classAdapter.notifyItemChanged(position)
+                Toast.makeText(requireContext(), "Update Success", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                // Handle the failure
+                Toast.makeText(requireContext(), "Update Failed", Toast.LENGTH_SHORT).show()
+            }
     }
 
-    private fun showComfirmDialog(position: Int) {
+    private fun showConfirmDialog(position: Int) {
         val dialog = MyDialog()
         dialog.show(parentFragmentManager, MyDialog.CONFIRM_DIALOG)
         dialog.confirmClick = {
-            if (it){
+            if (it) {
                 deleteClass(position)
             }
         }
     }
 
     private fun deleteClass(position: Int) {
-        dbHelper.deleteClass(classItems.get(position).cid!!)
-        classItems.removeAt(position)
-        classAdapter.notifyItemRemoved(position)
+        if (classItems.isNotEmpty() && position >= 0 && position < classItems.size) {
+            val classId = classItems[position].cid ?: return // Ensure classId is not null
+            val classRef = databaseReference.child(classId)
+
+            classRef.removeValue()
+                .addOnSuccessListener {
+//                    classItems.removeAt(position)
+                    classAdapter.notifyItemRemoved(position)
+                    Toast.makeText(requireContext(), "Delete Success", Toast.LENGTH_SHORT).show()
+                }
+                .addOnFailureListener {
+                    // Handle the failure
+                    Toast.makeText(requireContext(), "Delete Failed", Toast.LENGTH_SHORT).show()
+                }
+        } else {
+            Toast.makeText(requireContext(), "Invalid position", Toast.LENGTH_SHORT).show()
+        }
     }
 }

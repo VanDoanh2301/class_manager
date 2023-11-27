@@ -61,6 +61,7 @@
                 android:layout_centerVertical="true"
                 android:background="@android:color/transparent"
                 android:src="@drawable/ic_save"
+                android:visibility="gone"
                 tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
         </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>

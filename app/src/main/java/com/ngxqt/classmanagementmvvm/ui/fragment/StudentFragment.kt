@@ -1,6 +1,7 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.MenuItem
@@ -11,7 +12,13 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.GenericTypeIndicator
+import com.google.firebase.database.ValueEventListener
 import com.ngxqt.classmanagementmvvm.R
+import com.ngxqt.classmanagementmvvm.data.model.Attendance
 import com.ngxqt.classmanagementmvvm.data.model.StudentItem
 import com.ngxqt.classmanagementmvvm.databinding.FragmentStudentBinding
 import com.ngxqt.classmanagementmvvm.ui.adapter.StudentAdapter
@@ -21,6 +28,9 @@ import com.ngxqt.classmanagementmvvm.utils.DbHelper
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @AndroidEntryPoint
 class StudentFragment : Fragment() {
@@ -33,7 +43,10 @@ class StudentFragment : Fragment() {
     private lateinit var subjectName: String
     private lateinit var position: String
     private var cid: Long? = null
+    private var keyCid: String? = null
     private lateinit var calendar: MyCalendar
+    private val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+    val studentIds = mutableListOf<String>()
     private var total_Students = 0
     private var total_Present = 0
     private var total_Absences = 0
@@ -56,10 +69,11 @@ class StudentFragment : Fragment() {
         className = arguments?.getString("className").toString()
         subjectName = arguments?.getString("subjectName").toString()
         position = arguments?.getInt("position", -1).toString()
-        cid = arguments?.getLong("cid",-1)!!
+        cid = arguments?.getLong("cid", -1)!!
+        keyCid = arguments?.getString("keyCid")
 
-        setToolbar()
-        setBottom()
+//        setToolbar()
+//        setBottom()
 
         /**Cài đặt RecyclerView và Adapter để hiển thị item*/
         val recyclerView = binding.studentRecycler
@@ -69,14 +83,69 @@ class StudentFragment : Fragment() {
         studentAdapter = StudentAdapter(studentItems)
         recyclerView.adapter = studentAdapter
 
-        studentAdapter.onItemClick = {
-            changStatus(it)
-        }
+//        studentAdapter.onItemClick = {
+//            changStatus(it)
+//        }
         studentAdapter.onContactClick = {
             gotoContactActivity(it)
         }
+        binding.btnAttendance.setOnClickListener(View.OnClickListener {
+            gotoAttendance();
+        })
         loadData()
         //readDataJson()
+    }
+
+    private fun gotoAttendance() {
+        val attendanceRef = databaseReference.child(keyCid!!).child("attendance").
+        child(getCurrentDate())
+        val  studentRef = databaseReference.child(keyCid!!).child("students")
+        for (studentId in studentIds) {
+            val newAttendance = Attendance(studentId, "A")
+            for (i in studentItems) {
+                i.status = "A"
+                studentRef.child(studentId).child("status").setValue(i.status)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    studentAdapter.notifyDataSetChanged()
+                } else {
+                }
+            }
+            }
+            attendanceRef.child(studentId).setValue(newAttendance)
+        }
+
+        val TWO_MINUTES = 2 * 60 * 1000 // 2 phút expressed in milliseconds
+
+        val timer = object : CountDownTimer(TWO_MINUTES.toLong(), 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                // Mỗi giây được gọi trong suốt 2 phút (1000 milliseconds = 1 giây)
+                binding.cdAttendance.visibility = View.GONE
+                binding.lnSheet.visibility = View.VISIBLE
+                binding.toolbarStudent.apply {
+                    val minutes = (millisUntilFinished / 1000) / 60
+                    val seconds = (millisUntilFinished / 1000) % 60
+                    val formattedTime = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+                    subtitleToolbar.text = formattedTime
+
+                }
+            }
+
+            override fun onFinish() {
+                binding.toolbarStudent.save.visibility = View.VISIBLE
+            }
+        }
+
+        timer.start()
+
+
+
+    }
+
+    private fun getCurrentDate(): String {
+        val currentDate = Date()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd")
+        return dateFormat.format(currentDate)
     }
 
     private fun setBottom() {
@@ -118,105 +187,111 @@ class StudentFragment : Fragment() {
             "studentId" to studentItems.get(position).roll,
             "studentPhone" to "0347846669"
         )
-        findNavController().navigate(R.id.action_studentFragment_to_contactFragment,bundle)
+        findNavController().navigate(R.id.action_studentFragment_to_contactFragment, bundle)
     }
 
-    private fun readDataJson() {
-        val defaultIdList = mutableListOf<Int>()
-        val defaultNameList = mutableListOf<String>()
-
-        /**Đọc list_student.json*/
-        val jsonData = requireContext().resources.openRawResource(
-            requireContext().resources.getIdentifier(
-                "list_student",
-                "raw",requireContext().packageName
-            )
-        ).bufferedReader().use { it.readText() }
-        val outputJsonArray = JSONObject(jsonData).getJSONArray("data") as JSONArray
-        /**Gán Data vào List*/
-        for (i in 0 until outputJsonArray.length()){
-            val defaultId =  Integer.parseInt(outputJsonArray.getJSONObject(i).getString("studentId"))
-            val defaultName = outputJsonArray.getJSONObject(i).getString("studentName")
-            defaultIdList.add(defaultId)
-            defaultNameList.add(defaultName)
-        }
-
-        addDefaultStudent(defaultIdList,defaultNameList)
-    }
-
-    private fun addDefaultStudent(defaultId: MutableList<Int>, defaultName: MutableList<String>) {
-        val cursor = dbHelper.getStudentTabale(cid!!)
-        if (cursor.count == 0){
-            for (i in 0..defaultId.size-1){
-                val roll = defaultId[i]
-                val name = defaultName[i]
-                Log.i("LOG_DEFAUL", i.toString()+" "+roll.toString()+" "+i.toString()+" "+name)
-                val sid = dbHelper.addStudent(cid!!,roll,name)
-                dbHelper.addStatus(sid,cid!!,calendar.getDate(),"P")
-                val studentItem = StudentItem(sid,roll,name,"P")
-                studentItems.add(studentItem)
-                studentAdapter.notifyDataSetChanged()
-            }
-        }
-        cursor.close()
-    }
 
     private fun loadData() {
-        val cursor = dbHelper.getStudentTabale(cid!!)
-        Log.i("TAG","LOAD_DATA")
-        studentItems.clear()
-        total_Students = 0
-        while (cursor.moveToNext()){
-            val sid = cursor.getLong(cursor.getColumnIndex(DbHelper.S_ID))
-            val roll = cursor.getInt(cursor.getColumnIndex(DbHelper.STUDENT_ROLL_KEY))
-            val name = cursor.getString(cursor.getColumnIndex(DbHelper.STUDENT_NAME_KEY))
-            val status = dbHelper.getStatus(sid,calendar.getDate())
-            studentItems.add(StudentItem(sid,roll,name,status))
-            total_Students++
-        }
-        studentAdapter.notifyDataSetChanged()
-        cursor.close()
-        binding.totalStudents.setText(total_Students.toString())
+        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        databaseReference.child(keyCid!!).child("students")
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    studentItems.clear()
+
+                    for (childSnapshot in snapshot.children) {
+                        val sid = childSnapshot.child("sid").getValue(String::class.java)
+                        val roll = childSnapshot.child("roll").getValue(Int::class.java)
+                        val name = childSnapshot.child("name").getValue(String::class.java)
+                        val status = childSnapshot.child("status").getValue(String::class.java)
+
+                        if (sid != null) {
+                            studentIds.add(sid)
+                        }
+                        // Create StudentItem and add it to the list
+                        val studentItem = StudentItem(sid, roll, name, status)
+                        studentItems.add(studentItem)
+                    }
+
+                    studentAdapter.notifyDataSetChanged() // Notify adapter after updating the list
+//                binding.totalStudents.text = studentItems.size.toString() // Update the total students count
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    // Handle the error
+                }
+            })
+
         loadStatusData()
     }
 
+    private fun loadStatusData() {
+        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        val classReference = databaseReference.child(keyCid!!)
+
+        classReference.child("students").addValueEventListener(object :
+            ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                for (childSnapshot in snapshot.children) {
+                    val sid = childSnapshot.child("sid").getValue(String::class.java)
+                    val status = childSnapshot.child("status").getValue(String::class.java)
+
+
+                    val studentItem = studentItems.find { it.sid == sid }
+                    studentItem?.status = status
+                }
+
+                setAttendanceBottom()
+                studentAdapter.notifyDataSetChanged()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                // Handle error
+            }
+        })
+    }
+
     /**Xử lý Status*/
-    private fun changStatus(position: Int) {
-        var status = studentItems.get(position).status
-        if (status.equals("P")) {
-            status = "A"
-        } else if (status.equals("A")) {
-            status = "EA"
-        } else if (status.equals("EA")){
-            status = "P"
-        } else {
-            status = "P"
-        }
-        studentItems.get(position).status = status
-        studentAdapter.notifyItemChanged(position)
-        setAttendanceBottom()
-    }
+//    private fun changStatus(position: Int) {
+//        var status = studentItems[position].status
+//        if (status.equals("P")) {
+//            status = "A"
+//        } else if (status.equals("A")) {
+//            status = "EA"
+//        } else if (status.equals("EA")){
+//            status = "P"
+//        } else {
+//            status = "P"
+//        }
+//
+//        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+//        val classReference = databaseReference.child(keyCid!!)
+//        val studentReference = classReference.child("students").child(studentItems[position].sid.toString())
+//
+//        // Update the status in Firebase
+//        studentReference.child("status").setValue(status)
+//            .addOnCompleteListener { task ->
+//                if (task.isSuccessful) {
+//                    studentAdapter.notifyItemChanged(position)
+//                    setAttendanceBottom()
+//                } else {
+//                    // Handle error
+//                }
+//            }
+//    }
 
-    private fun saveStatus() {
-        for (studentItem: StudentItem in studentItems){
-            val status = studentItem.status
 
-            Log.i("LOG_VALUE","${studentItem.sid!!} + $cid + ${calendar.getDate()} + $status")
-            val value = dbHelper.addStatus(studentItem.sid!!,cid!!,calendar.getDate(),status)
-            //Log.i("LOG_VALUE",value.toString())
-            if (value==-1L){ dbHelper.updateStatus(studentItem.sid!!,calendar.getDate(),status) }
-            Log.i("TAG","SAVE_STATUS")
-        }
-    }
+//    private fun saveStatus() {
+//        for (studentItem: StudentItem in studentItems){
+//            val status = studentItem.status
+//
+//            Log.i("LOG_VALUE","${studentItem.sid!!} + $cid + ${calendar.getDate()} + $status")
+//            val value = dbHelper.addStatus(studentItem.sid!!,cid!!,calendar.getDate(),status)
+//            //Log.i("LOG_VALUE",value.toString())
+//            if (value==-1L){ dbHelper.updateStatus(studentItem.sid!!,calendar.getDate(),status) }
+//            Log.i("TAG","SAVE_STATUS")
+//        }
+//    }
 
-    private fun loadStatusData(){
-        for (studentItem: StudentItem in studentItems){
-            val status = dbHelper.getStatus(studentItem.sid!!,calendar.getDate())
-            studentItem.status = status
-        }
-        setAttendanceBottom()
-        studentAdapter.notifyDataSetChanged()
-    }
 
     private fun setAttendanceBottom(){
         total_Present = 0
@@ -239,122 +314,122 @@ class StudentFragment : Fragment() {
         }
     }
 
-    private fun setToolbar() {
-        binding.toolbarStudent.apply {
-            titleToolbar.setText(className)
-            subtitleToolbar.setText(subjectName+" | "+calendar.getDate())
-            back.setOnClickListener { requireActivity().onBackPressed() }
-            save.setOnClickListener {
-                Toast.makeText(requireContext(), "Saved", Toast.LENGTH_SHORT).show()
-                saveStatus()
-            }
-            toolbar.inflateMenu(R.menu.student_menu)
-            toolbar.setOnMenuItemClickListener {
-                when (it.itemId) {
-                    R.id.add_student -> showAddStudentDialog()
-                    R.id.show_Calendar -> showCalendar()
-                    R.id.show_attendance_sheet -> openSheetList()
-                }
-                true
-            }
-        }
-    }
+//    private fun setToolbar() {
+//        binding.toolbarStudent.apply {
+//            titleToolbar.setText(className)
+//            subtitleToolbar.setText(subjectName+" | "+calendar.getDate())
+//            back.setOnClickListener { requireActivity().onBackPressed() }
+//            save.setOnClickListener {
+//                Toast.makeText(requireContext(), "Saved", Toast.LENGTH_SHORT).show()
+//                saveStatus()
+//            }
+//            toolbar.inflateMenu(R.menu.student_menu)
+//            toolbar.setOnMenuItemClickListener {
+//                when (it.itemId) {
+//                    R.id.add_student -> showAddStudentDialog()
+//                    R.id.show_Calendar -> showCalendar()
+//                    R.id.show_attendance_sheet -> openSheetList()
+//                }
+//                true
+//            }
+//        }
+//    }
 
     /**Chọn Menu*/
     private fun showCalendar() {
-        calendar.show(parentFragmentManager,"")
-        calendar.onCalendarOkClick = {year, month, day ->
+        calendar.show(parentFragmentManager, "")
+        calendar.onCalendarOkClick = { year, month, day ->
             onCalendarOkClicked(year, month, day)
         }
     }
 
     private fun onCalendarOkClicked(year: Int, month: Int, day: Int) {
         calendar.setDate(year, month, day)
-        binding.toolbarStudent.subtitleToolbar.setText(subjectName+" | "+calendar.getDate())
+        binding.toolbarStudent.subtitleToolbar.setText(subjectName + " | " + calendar.getDate())
         loadStatusData()
     }
 
-    private fun showAddStudentDialog() {
-        val dialog = MyDialog()
-        dialog.show(parentFragmentManager, MyDialog.STUDENT_AND_DIALOG)
-        dialog.onItemStudentClick = {
-            addStudent(it.roll!!, it.name)
-        }
-    }
+//    private fun showAddStudentDialog() {
+//        val dialog = MyDialog()
+//        dialog.show(parentFragmentManager, MyDialog.STUDENT_AND_DIALOG)
+//        dialog.onItemStudentClick = {
+//            it.name?.let { it1 -> addStudent(it.roll!!, it1) }
+//        }
+//    }
 
-    private fun addStudent(roll: Int, name: String) {
-        val sid = dbHelper.addStudent(cid!!,roll,name)
-        dbHelper.addStatus(sid,cid!!,calendar.getDate(),"P")
-        val studentItem = StudentItem(sid,roll,name,"P")
-        studentItems.add(studentItem)
-        studentAdapter.notifyDataSetChanged()
-        Toast.makeText(requireContext(),"Add Success", Toast.LENGTH_SHORT).show()
-        loadData()
-    }
-
-    private fun openSheetList() {
-        val idArray  = LongArray(studentItems.size)
-        val rollArray = IntArray(studentItems.size)
-        val nameArray = Array<String?>(studentItems.size){null}
-        for (i in idArray.indices){
-            idArray[i] = studentItems.get(i).sid!!
-        }
-        for (i in rollArray.indices){
-            rollArray[i] = studentItems.get(i).roll!!
-        }
-        for (i in nameArray.indices){
-            nameArray[i] = studentItems.get(i).name
-        }
-        val bundle = bundleOf(
-            "cid" to cid,
-            "idArray" to idArray,
-            "rollArray" to rollArray,
-            "nameArray" to nameArray,
-            "className" to className,
-            "subjectName" to subjectName
-        )
-        findNavController().navigate(R.id.action_studentFragment_to_sheetListFragment,bundle)
-    }
+//    private fun addStudent(roll: Int, name: String) {
+//        val sid = dbHelper.addStudent(cid!!,roll,name)
+//        dbHelper.addStatus(sid,cid!!,calendar.getDate(),"P")
+//        val studentItem = StudentItem(sid,roll,name,"P")
+//        studentItems.add(studentItem)
+//        studentAdapter.notifyDataSetChanged()
+//        Toast.makeText(requireContext(),"Add Success", Toast.LENGTH_SHORT).show()
+//        loadData()
+//    }
+//
+//    private fun openSheetList() {
+//        val idArray  = LongArray(studentItems.size)
+//        val rollArray = IntArray(studentItems.size)
+//        val nameArray = Array<String?>(studentItems.size){null}
+//        for (i in idArray.indices){
+//            idArray[i] = studentItems.get(i).sid!!
+//        }
+//        for (i in rollArray.indices){
+//            rollArray[i] = studentItems.get(i).roll!!
+//        }
+//        for (i in nameArray.indices){
+//            nameArray[i] = studentItems.get(i).name
+//        }
+//        val bundle = bundleOf(
+//            "cid" to cid,
+//            "idArray" to idArray,
+//            "rollArray" to rollArray,
+//            "nameArray" to nameArray,
+//            "className" to className,
+//            "subjectName" to subjectName
+//        )
+//        findNavController().navigate(R.id.action_studentFragment_to_sheetListFragment,bundle)
+//    }
 
     /**Bấm giữ item để Delete hoặc Update Student*/
-    override fun onContextItemSelected(item: MenuItem): Boolean {
-        when(item.itemId){
-            0 -> showUpdateStudentDialog(item.groupId)
-            1 -> showComfirmDialog(item.groupId)
-        }
-        return super.onContextItemSelected(item)
-    }
+//    override fun onContextItemSelected(item: MenuItem): Boolean {
+//        when(item.itemId){
+//            0 -> showUpdateStudentDialog(item.groupId)
+//            1 -> showComfirmDialog(item.groupId)
+//        }
+//        return super.onContextItemSelected(item)
+//    }
 
-    private fun showUpdateStudentDialog(position: Int) {
-        val dialog = MyDialog(studentItems.get(position).roll,studentItems.get(position).name)
-        dialog.show(parentFragmentManager, MyDialog.STUDENT_UPDATE_DIALOG)
-        dialog.onItemStudentClick = {
-            updateStudent(position,it.roll!!,it.name)
-        }
-    }
+//    private fun showUpdateStudentDialog(position: Int) {
+//        val dialog = MyDialog(studentItems.get(position).roll,studentItems.get(position).name)
+//        dialog.show(parentFragmentManager, MyDialog.STUDENT_UPDATE_DIALOG)
+//        dialog.onItemStudentClick = {
+//            it.name?.let { it1 -> updateStudent(position,it.roll!!, it1) }
+//        }
+//    }
 
-    private fun updateStudent(position: Int, roll: Int,name: String) {
-        dbHelper.updateStudent(studentItems.get(position).sid!!,roll, name)
-        studentItems.get(position).roll = roll
-        studentItems.get(position).name = name
-        studentAdapter.notifyItemChanged(position)
-        Toast.makeText(requireContext(),"Update Success", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun showComfirmDialog(position: Int) {
-        val dialog = MyDialog()
-        dialog.show(parentFragmentManager, MyDialog.CONFIRM_DIALOG)
-        dialog.confirmClick = {
-            if (it){
-                deleteStudent(position)
-            }
-        }
-    }
-
-    private fun deleteStudent(position: Int) {
-        dbHelper.deleteStudent(studentItems.get(position).sid!!)
-        studentItems.removeAt(position)
-        studentAdapter.notifyItemRemoved(position)
-        loadData()
-    }
+//    private fun updateStudent(position: Int, roll: Int,name: String) {
+//        dbHelper.updateStudent(studentItems.get(position).sid!!,roll, name)
+//        studentItems.get(position).roll = roll
+//        studentItems.get(position).name = name
+//        studentAdapter.notifyItemChanged(position)
+//        Toast.makeText(requireContext(),"Update Success", Toast.LENGTH_SHORT).show()
+//    }
+//
+//    private fun showComfirmDialog(position: Int) {
+//        val dialog = MyDialog()
+//        dialog.show(parentFragmentManager, MyDialog.CONFIRM_DIALOG)
+//        dialog.confirmClick = {
+//            if (it){
+//                deleteStudent(position)
+//            }
+//        }
+//    }
+//
+//    private fun deleteStudent(position: Int) {
+//        dbHelper.deleteStudent(studentItems.get(position).sid!!)
+//        studentItems.removeAt(position)
+//        studentAdapter.notifyItemRemoved(position)
+//        loadData()
+//    }
 }

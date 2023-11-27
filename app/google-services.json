@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "554635475340",
+    "project_id": "class-management-mvvm",
+    "storage_bucket": "class-management-mvvm.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:554635475340:android:2937fb231b28491d743ea9",
+        "android_client_info": {
+          "package_name": "com.ngxqt.classmanagementmvvm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeWMXQQPhqpi8ShMoagWhIfgsKgf8wvow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
