@@ -17,7 +17,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class SplashFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         Handler(Looper.getMainLooper()).postDelayed({
-            findNavController().navigate(R.id.action_splashFragment_to_classFragment)
+            findNavController().navigate(R.id.action_splashFragment_to_loginFragment)
         }, 1000)
         return inflater.inflate(R.layout.fragment_splash, container, false)
     }

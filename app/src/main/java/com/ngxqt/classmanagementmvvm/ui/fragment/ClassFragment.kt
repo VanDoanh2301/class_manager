@@ -1,5 +1,6 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
+import android.content.ContentValues.TAG
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -18,6 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import com.ngxqt.classmanagementmvvm.R
+import com.ngxqt.classmanagementmvvm.data.dto.StudentDto
 import com.ngxqt.classmanagementmvvm.data.model.ClassItem
 import com.ngxqt.classmanagementmvvm.data.model.StudentItem
 import com.ngxqt.classmanagementmvvm.databinding.FragmentClassBinding
@@ -56,8 +58,6 @@ class ClassFragment : Fragment() {
         calendar = MyCalendar()
         auth = FirebaseAuth.getInstance()
         databaseReference = FirebaseDatabase.getInstance().getReference("classes")
-
-
         binding.fabMain.setOnClickListener { showDialog() }
         setToolbar()
         loadData()
@@ -75,7 +75,6 @@ class ClassFragment : Fragment() {
         classAdapter.onMapClick = {
             gotoMapFragment(it)
         }
-
 
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             requireActivity().finishAffinity()
@@ -151,7 +150,6 @@ class ClassFragment : Fragment() {
     }
 
     private fun addDefaultClass(className: String, subjectName: String) {
-
         if (classItems.isEmpty()) {
             val cid = databaseReference.push().key
             val classItem = ClassItem(cid, className, subjectName, false)
@@ -192,17 +190,32 @@ class ClassFragment : Fragment() {
                     for (i in 0 until defaultId.size) {
                         val roll = defaultId[i]
                         val name = defaultName[i]
-                        val newStudentRef = studentsRef.push()
-                        val studentItem = StudentItem(newStudentRef.key, roll, name, "P")
-                        newStudentRef.setValue(studentItem)
+                        auth.createUserWithEmailAndPassword("${roll}@gmail.com", roll.toString())
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    Log.d(TAG, "createUserWithEmail:success")
+                                    val user = auth.currentUser
+                                    val userId = user?.uid
+                                    val userEmail = user?.email
+
+                                    val newStudentRef = studentsRef.child(userId.toString())
+                                    val studentItem = StudentDto(userId, roll, name, userEmail, roll.toString(), "Student")
+                                    newStudentRef.setValue(studentItem)
+                                } else {
+                                    Log.w(TAG, "createUserWithEmail:failure", task.exception)
+                                }
+                            }
+
                     }
                 }
             }
 
             override fun onCancelled(databaseError: DatabaseError) {
-                Log.w("Firebase", "loadPost:onCancelled", databaseError.toException())
+                // Handle database error if needed
+                Log.e(TAG, "onCancelled", databaseError.toException())
             }
         })
+
     }
 
     override fun onContextItemSelected(item: MenuItem): Boolean {

@@ -14,4 +14,6 @@
     <color name="absent">#fbc8c8</color>
     <color name="excusedAbsent">#fbedc2</color>
     <color name="normal">#FFFFFFFF</color>
+    <color name="lavender">#8692f7</color>
+    <color name="grey">#ff424242</color>
 </resources>
