@@ -1,6 +1,8 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
 import android.content.ContentValues.TAG
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -27,6 +29,7 @@ import com.ngxqt.classmanagementmvvm.databinding.ToolbarBinding
 import com.ngxqt.classmanagementmvvm.ui.adapter.ClassAdapter
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyCalendar
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyDialog
+import com.ngxqt.classmanagementmvvm.utils.ClassPreference
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONArray
 import org.json.JSONObject
@@ -40,6 +43,8 @@ class ClassFragment : Fragment() {
     private lateinit var calendar: MyCalendar
     private lateinit var databaseReference: DatabaseReference
     private lateinit var auth: FirebaseAuth
+    private var role:String? = null
+    private var uid:String? =null
 
     private lateinit var classAdapter: ClassAdapter
     private val classItems: ArrayList<ClassItem> = ArrayList()
@@ -58,9 +63,33 @@ class ClassFragment : Fragment() {
         calendar = MyCalendar()
         auth = FirebaseAuth.getInstance()
         databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        uid = arguments?.getString("uid")
         binding.fabMain.setOnClickListener { showDialog() }
         setToolbar()
         loadData()
+
+        val database =  FirebaseDatabase.getInstance()
+        val ref = database.getReference("User").child("teachers").child(uid!!)
+        ref.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    role = dataSnapshot.child("role").getValue(String::class.java)
+                    binding.fabMain.visibility = View.VISIBLE
+
+                } else {
+                    binding.fabMain.visibility = View.GONE
+                    role = "USER"
+                }
+            }
+
+            override fun onCancelled(databaseError: DatabaseError) {
+                binding.fabMain.visibility = View.GONE
+            }
+        })
+
+
+
+
 
         val recyclerView = binding.recyclerView
         val layoutManager = LinearLayoutManager(requireContext())
@@ -115,6 +144,8 @@ class ClassFragment : Fragment() {
     private fun gotoStudentFragment(position: Int) {
         val idClass = databaseReference.push().key
         val bundle = bundleOf(
+            "uid" to uid,
+            "role" to role,
             "className" to classItems[position].className,
             "subjectName" to classItems[position].subjectName,
             "position" to position,
@@ -152,7 +183,7 @@ class ClassFragment : Fragment() {
     private fun addDefaultClass(className: String, subjectName: String) {
         if (classItems.isEmpty()) {
             val cid = databaseReference.push().key
-            val classItem = ClassItem(cid, className, subjectName, false)
+            val classItem = ClassItem(cid, className, subjectName, "false")
             databaseReference.child(cid!!).setValue(classItem)
             readDataJson(cid)
         }

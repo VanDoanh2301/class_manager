@@ -4,9 +4,9 @@ data class ClassItem(
     var cid: String? = null,
     var className: String = "",
     var subjectName: String = "",
-    var status:Boolean = false
+    var status:String = ""
 ) {
     // Thêm constructor không đối số
-    constructor() : this(null, "", "", false)
+    constructor() : this(null, "", "", "")
 }
 

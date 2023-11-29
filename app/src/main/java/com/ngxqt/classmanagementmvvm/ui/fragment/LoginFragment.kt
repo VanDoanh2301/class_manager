@@ -1,20 +1,28 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.View.OnClickListener
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.ngxqt.classmanagementmvvm.R
 import com.ngxqt.classmanagementmvvm.databinding.FragmentLoginBinding
+import com.ngxqt.classmanagementmvvm.utils.ClassPreference
 
 
 class LoginFragment : Fragment() {
@@ -49,8 +57,15 @@ class LoginFragment : Fragment() {
         mAuth!!.signInWithEmailAndPassword(email, password).addOnCompleteListener {
             if (it.isSuccessful) {
                 val user = mAuth!!.currentUser
-                findNavController().navigate(R.id.action_loginFragment_to_classFragment)
-            } else {
+                val uid = user?.uid
+
+                val bundle = bundleOf(
+                    "uid" to uid
+                )
+               findNavController().navigate(R.id.action_loginFragment_to_classFragment, bundle)
+
+            }
+            else {
                 Toast.makeText(
                     context, "Authentication failed.",
                     Toast.LENGTH_SHORT

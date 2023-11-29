@@ -18,12 +18,15 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.GenericTypeIndicator
 import com.google.firebase.database.ValueEventListener
 import com.ngxqt.classmanagementmvvm.R
+import com.ngxqt.classmanagementmvvm.data.dto.StudentDto
 import com.ngxqt.classmanagementmvvm.data.model.Attendance
 import com.ngxqt.classmanagementmvvm.data.model.StudentItem
 import com.ngxqt.classmanagementmvvm.databinding.FragmentStudentBinding
 import com.ngxqt.classmanagementmvvm.ui.adapter.StudentAdapter
+import com.ngxqt.classmanagementmvvm.ui.adapter.StudentAttendanceAdapter
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyCalendar
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyDialog
+import com.ngxqt.classmanagementmvvm.utils.ClassPreference
 import com.ngxqt.classmanagementmvvm.utils.DbHelper
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONArray
@@ -38,7 +41,9 @@ class StudentFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var dbHelper: DbHelper
     private lateinit var studentAdapter: StudentAdapter
+    private lateinit var studentAttendance: StudentAttendanceAdapter
     private val studentItems: ArrayList<StudentItem> = ArrayList()
+    private val students: ArrayList<StudentItem> = ArrayList()
     private lateinit var className: String
     private lateinit var subjectName: String
     private lateinit var position: String
@@ -51,6 +56,8 @@ class StudentFragment : Fragment() {
     private var total_Present = 0
     private var total_Absences = 0
     private var total_ExcusedAbsences = 0
+    private var role:String? =null
+    private var uid:String? =null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -71,17 +78,33 @@ class StudentFragment : Fragment() {
         position = arguments?.getInt("position", -1).toString()
         cid = arguments?.getLong("cid", -1)!!
         keyCid = arguments?.getString("keyCid")
+        uid = arguments?.getString("uid")
+        role = arguments?.getString("role")
+        Log.d("role", role+"")
 
+        if (role.equals("USER")) {
+            binding.btnAttendance.visibility = View.GONE
+        } else {
+            binding.btnAttendance.visibility =View.VISIBLE
+        }
 //        setToolbar()
 //        setBottom()
 
         /**Cài đặt RecyclerView và Adapter để hiển thị item*/
         val recyclerView = binding.studentRecycler
+        val recy = binding.studentAttendance
         val layoutManager = LinearLayoutManager(requireContext())
+        val layoutAd = LinearLayoutManager(requireContext())
         recyclerView.layoutManager = layoutManager
+        recy.layoutManager = layoutAd
         recyclerView.setHasFixedSize(true)
-        studentAdapter = StudentAdapter(studentItems)
-        recyclerView.adapter = studentAdapter
+        recy.setHasFixedSize(true)
+        studentAttendance = StudentAttendanceAdapter(studentItems)
+        studentAdapter = StudentAdapter(students)
+        recyclerView.adapter = studentAttendance
+        recy.adapter = studentAdapter
+
+
 
 //        studentAdapter.onItemClick = {
 //            changStatus(it)
@@ -92,8 +115,45 @@ class StudentFragment : Fragment() {
         binding.btnAttendance.setOnClickListener(View.OnClickListener {
             gotoAttendance();
         })
+
+        databaseReference.child(keyCid!!).addValueEventListener(object : ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                    val status = snapshot.child("status").getValue(String::class.java)
+                    if (status.equals("true")) {
+
+                        recyclerView.visibility = View.GONE
+                        recy.visibility = View.VISIBLE
+                        if (role.equals("USER")) {
+                            binding.toolbarStudent.attendance.visibility = View.VISIBLE
+                        } else {
+                            binding.toolbarStudent.attendance.visibility = View.GONE
+                        }
+                    } else {
+                        recyclerView.visibility = View.VISIBLE
+                        recy.visibility = View.GONE
+                        binding.toolbarStudent.attendance.visibility = View.GONE
+                    }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+
+            }
+
+        })
         loadData()
         //readDataJson()
+
+        binding.toolbarStudent.attendance.setOnClickListener {
+            val attendanceRef = databaseReference.child(keyCid!!).child("attendance").
+            child(getCurrentDate())
+            attendanceRef.child(uid!!).child("status").setValue("P").addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        studentAttendance.notifyDataSetChanged()
+                        Toast.makeText(requireContext(), "Attendance success", Toast.LENGTH_SHORT).show()
+                    } else {
+                    }
+                }
+            }
     }
 
     private fun gotoAttendance() {
@@ -107,12 +167,17 @@ class StudentFragment : Fragment() {
                 studentRef.child(studentId).child("status").setValue(i.status)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    studentAdapter.notifyDataSetChanged()
+                    studentAttendance.notifyDataSetChanged()
                 } else {
                 }
             }
             }
             attendanceRef.child(studentId).setValue(newAttendance)
+
+        }
+
+        databaseReference.child(keyCid!!).child("status").setValue("true").addOnCompleteListener {
+
         }
 
         val TWO_MINUTES = 2 * 60 * 1000 // 2 phút expressed in milliseconds
@@ -133,6 +198,9 @@ class StudentFragment : Fragment() {
 
             override fun onFinish() {
                 binding.toolbarStudent.save.visibility = View.VISIBLE
+                databaseReference.child(keyCid!!).child("status").setValue("false").addOnCompleteListener {
+
+                }
             }
         }
 
@@ -197,7 +265,6 @@ class StudentFragment : Fragment() {
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     studentItems.clear()
-
                     for (childSnapshot in snapshot.children) {
                         val sid = childSnapshot.child("sid").getValue(String::class.java)
                         val roll = childSnapshot.child("roll").getValue(Int::class.java)
@@ -221,6 +288,43 @@ class StudentFragment : Fragment() {
                 }
             })
 
+        databaseReference.child(keyCid!!).child("attendance").child(getCurrentDate())
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                   students.clear()
+                    for (childSnapshot in snapshot.children) {
+
+                        val studentId = childSnapshot.child("studentId").getValue(String::class.java)
+                        val sts = childSnapshot.child("status").getValue(String::class.java)
+                        databaseReference.child(keyCid!!).child("students").addValueEventListener(object : ValueEventListener{
+                            override fun onDataChange(snapshot: DataSnapshot) {
+                                val studentSnapshot = snapshot.child(studentId!!)
+                                val sid = studentSnapshot .child("sid").getValue(String::class.java)
+                                val roll = studentSnapshot .child("roll").getValue(Int::class.java)
+                                val name = studentSnapshot .child("name").getValue(String::class.java)
+
+                                val newStudent =  StudentItem(sid, roll,name,sts)
+                                students.add(newStudent)
+                                studentAttendance.notifyDataSetChanged()
+
+                            }
+                            override fun onCancelled(error: DatabaseError) {
+
+                            }
+
+                        })
+                        studentAttendance.notifyDataSetChanged()
+
+                    }
+
+
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    // Handle the error
+                }
+            })
+
         loadStatusData()
     }
 
@@ -228,11 +332,11 @@ class StudentFragment : Fragment() {
         val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
         val classReference = databaseReference.child(keyCid!!)
 
-        classReference.child("students").addValueEventListener(object :
+        classReference.child("attendance").child(getCurrentDate()).addValueEventListener(object :
             ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 for (childSnapshot in snapshot.children) {
-                    val sid = childSnapshot.child("sid").getValue(String::class.java)
+                    val sid = childSnapshot.child("studentId").getValue(String::class.java)
                     val status = childSnapshot.child("status").getValue(String::class.java)
 
 
@@ -297,7 +401,7 @@ class StudentFragment : Fragment() {
         total_Present = 0
         total_Absences = 0
         total_ExcusedAbsences = 0
-        for (studentItem: StudentItem in studentItems){
+        for (studentItem: StudentItem in students){
             val status = studentItem.status
             if(status == "P"){
                 total_Present++
