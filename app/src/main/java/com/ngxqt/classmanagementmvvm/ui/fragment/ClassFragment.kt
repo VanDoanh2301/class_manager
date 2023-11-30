@@ -43,8 +43,11 @@ class ClassFragment : Fragment() {
     private lateinit var calendar: MyCalendar
     private lateinit var databaseReference: DatabaseReference
     private lateinit var auth: FirebaseAuth
-    private var role:String? = null
-    private var uid:String? =null
+    private var role: String? = null
+    private var uid: String? = null
+    private var nameTxt: String? = null
+    private lateinit var studentDto: StudentDto
+
 
     private lateinit var classAdapter: ClassAdapter
     private val classItems: ArrayList<ClassItem> = ArrayList()
@@ -65,10 +68,12 @@ class ClassFragment : Fragment() {
         databaseReference = FirebaseDatabase.getInstance().getReference("classes")
         uid = arguments?.getString("uid")
         binding.fabMain.setOnClickListener { showDialog() }
+
+
         setToolbar()
         loadData()
 
-        val database =  FirebaseDatabase.getInstance()
+        val database = FirebaseDatabase.getInstance()
         val ref = database.getReference("User").child("teachers").child(uid!!)
         ref.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(dataSnapshot: DataSnapshot) {
@@ -88,9 +93,6 @@ class ClassFragment : Fragment() {
         })
 
 
-
-
-
         val recyclerView = binding.recyclerView
         val layoutManager = LinearLayoutManager(requireContext())
         recyclerView.layoutManager = layoutManager
@@ -104,9 +106,19 @@ class ClassFragment : Fragment() {
         classAdapter.onMapClick = {
             gotoMapFragment(it)
         }
-
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             requireActivity().finishAffinity()
+        }
+        binding.toolbarMain.logout.setOnClickListener {
+            auth.signOut()
+            val navController = findNavController()
+            navController.popBackStack(R.id.classFragment, true)
+            navController.navigate(R.id.loginFragment)
+        }
+        if (role == "TEACHER") {
+            binding.toolbarMain.subtitleToolbar.text = "Hello teacher"
+        } else {
+            binding.toolbarMain.subtitleToolbar.text = "Hello students"
         }
     }
 
@@ -138,6 +150,7 @@ class ClassFragment : Fragment() {
             subtitleToolbar.text = "Class List"
             back.isInvisible = true
             save.isInvisible = true
+            logout.visibility = View.VISIBLE
         }
     }
 
@@ -197,23 +210,29 @@ class ClassFragment : Fragment() {
         val jsonData = requireContext().resources?.openRawResource(
             requireContext().resources.getIdentifier(
                 "list_student",
-                "raw",requireContext().packageName
+                "raw", requireContext().packageName
             )
         )?.bufferedReader().use { it?.readText() }
         val outputJsonArray = JSONObject(jsonData).getJSONArray("data") as JSONArray
         /**Gán Data vào List*/
-        for (i in 0 until outputJsonArray.length()){
-            val defaultId =  Integer.parseInt(outputJsonArray.getJSONObject(i).getString("studentId"))
+        for (i in 0 until outputJsonArray.length()) {
+            val defaultId =
+                Integer.parseInt(outputJsonArray.getJSONObject(i).getString("studentId"))
             val defaultName = outputJsonArray.getJSONObject(i).getString("studentName")
             defaultIdList.add(defaultId)
             defaultNameList.add(defaultName)
         }
 
-        addDefaultStudent(defaultIdList,defaultNameList,cid)
+        addDefaultStudent(defaultIdList, defaultNameList, cid)
     }
 
-    private fun addDefaultStudent(defaultId: MutableList<Int>, defaultName: MutableList<String>, cid: String) {
+    private fun addDefaultStudent(
+        defaultId: MutableList<Int>,
+        defaultName: MutableList<String>,
+        cid: String
+    ) {
         val studentsRef = databaseReference.child(cid).child("students")
+
 
         studentsRef.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(dataSnapshot: DataSnapshot) {
@@ -230,7 +249,15 @@ class ClassFragment : Fragment() {
                                     val userEmail = user?.email
 
                                     val newStudentRef = studentsRef.child(userId.toString())
-                                    val studentItem = StudentDto(userId, roll, name, userEmail, roll.toString(), "Student")
+                                    val studentItem = StudentDto(
+                                        userId,
+                                        roll,
+                                        name,
+                                        userEmail,
+                                        roll.toString(),
+                                        "Student"
+                                    )
+                                    studentDto = studentItem
                                     newStudentRef.setValue(studentItem)
                                 } else {
                                     Log.w(TAG, "createUserWithEmail:failure", task.exception)
@@ -250,11 +277,15 @@ class ClassFragment : Fragment() {
     }
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
-        when (item.itemId) {
-            0 -> showUpdateDialog(item.groupId)
-            1 -> showConfirmDialog(item.groupId)
+        if (role != "USER") {
+            when (item.itemId) {
+                0 -> showUpdateDialog(item.groupId)
+                1 -> showConfirmDialog(item.groupId)
+            }
         }
-        return super.onContextItemSelected(item)
+        Toast.makeText(requireContext(), "Only teachers can do this", Toast.LENGTH_SHORT).show()
+
+        return true
     }
 
     private fun showUpdateDialog(position: Int) {

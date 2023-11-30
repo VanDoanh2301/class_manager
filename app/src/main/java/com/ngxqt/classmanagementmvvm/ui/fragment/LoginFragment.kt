@@ -39,6 +39,7 @@ class LoginFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.prsBar.visibility = View.GONE
         mAuth = FirebaseAuth.getInstance()
         binding.btnLogin.setOnClickListener(OnClickListener {
             if (binding.email.text.toString().trim { it <= ' ' }.isEmpty()) {
@@ -62,8 +63,8 @@ class LoginFragment : Fragment() {
                 val bundle = bundleOf(
                     "uid" to uid
                 )
+                binding.prsBar.visibility = View.VISIBLE
                findNavController().navigate(R.id.action_loginFragment_to_classFragment, bundle)
-
             }
             else {
                 Toast.makeText(

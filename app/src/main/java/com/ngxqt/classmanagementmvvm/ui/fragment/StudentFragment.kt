@@ -1,5 +1,6 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
+import android.content.ContentValues
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
@@ -12,6 +13,7 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -53,6 +55,7 @@ class StudentFragment : Fragment() {
     private val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
     val studentIds = mutableListOf<String>()
     private var total_Students = 0
+    private lateinit var auth: FirebaseAuth
     private var total_Present = 0
     private var total_Absences = 0
     private var total_ExcusedAbsences = 0
@@ -81,13 +84,16 @@ class StudentFragment : Fragment() {
         uid = arguments?.getString("uid")
         role = arguments?.getString("role")
         Log.d("role", role+"")
-
+        auth = FirebaseAuth.getInstance()
+        binding.toolbarStudent.titleToolbar.text = "Students"
         if (role.equals("USER")) {
             binding.btnAttendance.visibility = View.GONE
+            binding.toolbarStudent.cdCheck.visibility = View.GONE
         } else {
             binding.btnAttendance.visibility =View.VISIBLE
+            binding.toolbarStudent.cdCheck.visibility = View.VISIBLE
         }
-//        setToolbar()
+        setToolbar()
 //        setBottom()
 
         /**Cài đặt RecyclerView và Adapter để hiển thị item*/
@@ -105,32 +111,33 @@ class StudentFragment : Fragment() {
         recy.adapter = studentAdapter
 
 
-
-//        studentAdapter.onItemClick = {
-//            changStatus(it)
-//        }
-        studentAdapter.onContactClick = {
+        if (recyclerView.visibility == View.VISIBLE) {
+            binding.toolbarStudent.subtitleToolbar.text =  getCurrentDate()
+        }
+        studentAdapter.onItemClick = {
+           changStatus(it)
+        }
+        studentAttendance.onContactClick = {
             gotoContactActivity(it)
         }
         binding.btnAttendance.setOnClickListener(View.OnClickListener {
             gotoAttendance();
         })
 
+        binding.toolbarStudent.cdCheck.visibility = View.GONE
         databaseReference.child(keyCid!!).addValueEventListener(object : ValueEventListener{
             override fun onDataChange(snapshot: DataSnapshot) {
                     val status = snapshot.child("status").getValue(String::class.java)
                     if (status.equals("true")) {
-
                         recyclerView.visibility = View.GONE
                         recy.visibility = View.VISIBLE
                         if (role.equals("USER")) {
+                            binding.toolbarStudent.subtitleToolbar.text =  "Start"
                             binding.toolbarStudent.attendance.visibility = View.VISIBLE
                         } else {
                             binding.toolbarStudent.attendance.visibility = View.GONE
                         }
                     } else {
-                        recyclerView.visibility = View.VISIBLE
-                        recy.visibility = View.GONE
                         binding.toolbarStudent.attendance.visibility = View.GONE
                     }
             }
@@ -154,6 +161,13 @@ class StudentFragment : Fragment() {
                     }
                 }
             }
+    }
+
+    private fun gotoStorage() {
+        val bundle = bundleOf(
+            "keyCid" to keyCid,
+        )
+        findNavController().navigate(R.id.action_studentFragment_to_storageFragment, bundle)
     }
 
     private fun gotoAttendance() {
@@ -199,7 +213,7 @@ class StudentFragment : Fragment() {
             override fun onFinish() {
                 binding.toolbarStudent.save.visibility = View.VISIBLE
                 databaseReference.child(keyCid!!).child("status").setValue("false").addOnCompleteListener {
-
+                    binding.toolbarStudent.subtitleToolbar.text =  "Finish"
                 }
             }
         }
@@ -306,6 +320,8 @@ class StudentFragment : Fragment() {
                                 val newStudent =  StudentItem(sid, roll,name,sts)
                                 students.add(newStudent)
                                 studentAttendance.notifyDataSetChanged()
+                                loadStatusData()
+
 
                             }
                             override fun onCancelled(error: DatabaseError) {
@@ -313,7 +329,7 @@ class StudentFragment : Fragment() {
                             }
 
                         })
-                        studentAttendance.notifyDataSetChanged()
+
 
                     }
 
@@ -355,33 +371,31 @@ class StudentFragment : Fragment() {
     }
 
     /**Xử lý Status*/
-//    private fun changStatus(position: Int) {
-//        var status = studentItems[position].status
-//        if (status.equals("P")) {
-//            status = "A"
-//        } else if (status.equals("A")) {
-//            status = "EA"
-//        } else if (status.equals("EA")){
-//            status = "P"
-//        } else {
-//            status = "P"
-//        }
-//
-//        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
-//        val classReference = databaseReference.child(keyCid!!)
-//        val studentReference = classReference.child("students").child(studentItems[position].sid.toString())
-//
-//        // Update the status in Firebase
-//        studentReference.child("status").setValue(status)
-//            .addOnCompleteListener { task ->
-//                if (task.isSuccessful) {
-//                    studentAdapter.notifyItemChanged(position)
-//                    setAttendanceBottom()
-//                } else {
-//                    // Handle error
-//                }
-//            }
-//    }
+    private fun changStatus(position: Int) {
+        var status = students[position].status
+        if (status.equals("P")) {
+            status = "A"
+        } else if (status.equals("A")) {
+            status = "EA"
+        } else if (status.equals("EA")){
+            status = "P"
+        } else {
+            status = "P"
+        }
+
+        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        val classReference = databaseReference.child(keyCid!!)
+        val studentReference = classReference.child("attendance").child(getCurrentDate()).child(students[position].sid.toString())
+        studentReference.child("status").setValue(status)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    studentAdapter.notifyItemChanged(position)
+                    setAttendanceBottom()
+                } else {
+                    // Handle error
+                }
+            }
+    }
 
 
 //    private fun saveStatus() {
@@ -412,32 +426,31 @@ class StudentFragment : Fragment() {
             }
         }
         binding.apply {
-            totalPresent.setText(total_Present.toString())
-            totalAbsences.setText(total_Absences.toString())
-            totalExcusedAbsences.setText(total_ExcusedAbsences.toString())
+            totalPresent.text = total_Present.toString()
+            totalAbsences.text = total_Absences.toString()
+            totalExcusedAbsences.text = total_ExcusedAbsences.toString()
         }
     }
 
-//    private fun setToolbar() {
-//        binding.toolbarStudent.apply {
+    private fun setToolbar() {
+        binding.toolbarStudent.apply {
 //            titleToolbar.setText(className)
 //            subtitleToolbar.setText(subjectName+" | "+calendar.getDate())
-//            back.setOnClickListener { requireActivity().onBackPressed() }
-//            save.setOnClickListener {
-//                Toast.makeText(requireContext(), "Saved", Toast.LENGTH_SHORT).show()
-//                saveStatus()
-//            }
-//            toolbar.inflateMenu(R.menu.student_menu)
-//            toolbar.setOnMenuItemClickListener {
-//                when (it.itemId) {
-//                    R.id.add_student -> showAddStudentDialog()
-//                    R.id.show_Calendar -> showCalendar()
-//                    R.id.show_attendance_sheet -> openSheetList()
-//                }
-//                true
-//            }
-//        }
-//    }
+            back.setOnClickListener { requireActivity().onBackPressed() }
+            save.setOnClickListener {
+                Toast.makeText(requireContext(), "Saved", Toast.LENGTH_SHORT).show()
+            }
+            toolbar.inflateMenu(R.menu.student_menu)
+            toolbar.setOnMenuItemClickListener {
+                when (it.itemId) {
+                    R.id.add_student -> showAddStudentDialog()
+                    R.id.show_Calendar -> showCalendar()
+                  R.id.show_attendance_sheet -> gotoStorage()
+                }
+                true
+            }
+        }
+    }
 
     /**Chọn Menu*/
     private fun showCalendar() {
@@ -453,23 +466,42 @@ class StudentFragment : Fragment() {
         loadStatusData()
     }
 
-//    private fun showAddStudentDialog() {
-//        val dialog = MyDialog()
-//        dialog.show(parentFragmentManager, MyDialog.STUDENT_AND_DIALOG)
-//        dialog.onItemStudentClick = {
-//            it.name?.let { it1 -> addStudent(it.roll!!, it1) }
-//        }
-//    }
+    private fun showAddStudentDialog() {
+        val dialog = MyDialog()
+        dialog.show(parentFragmentManager, MyDialog.STUDENT_AND_DIALOG)
+        dialog.onItemStudentClick = {
+            it.name?.let { it1 -> addStudent(it.roll!!, it1) }
+        }
+    }
 
-//    private fun addStudent(roll: Int, name: String) {
-//        val sid = dbHelper.addStudent(cid!!,roll,name)
-//        dbHelper.addStatus(sid,cid!!,calendar.getDate(),"P")
-//        val studentItem = StudentItem(sid,roll,name,"P")
-//        studentItems.add(studentItem)
-//        studentAdapter.notifyDataSetChanged()
-//        Toast.makeText(requireContext(),"Add Success", Toast.LENGTH_SHORT).show()
-//        loadData()
-//    }
+    private fun addStudent(roll: Int, name: String) {
+        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        val studentsRef = databaseReference.child(keyCid!!).child("students")
+        studentsRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                        auth.createUserWithEmailAndPassword("${roll}@gmail.com", roll.toString())
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    Log.d(ContentValues.TAG, "createUserWithEmail:success")
+                                    val user = auth.currentUser
+                                    val userId = user?.uid
+                                    val userEmail = user?.email
+
+                                    val newStudentRef = studentsRef.child(userId.toString())
+                                    val studentItem = StudentDto(userId, roll, name, userEmail, roll.toString(), "Student")
+                                    newStudentRef.setValue(studentItem)
+                                } else {
+                                    Log.w(ContentValues.TAG, "createUserWithEmail:failure", task.exception)
+                                } }
+            }
+
+            override fun onCancelled(databaseError: DatabaseError) {
+                // Handle database error if needed
+                Log.e(ContentValues.TAG, "onCancelled", databaseError.toException())
+            }
+        })
+        loadData()
+    }
 //
 //    private fun openSheetList() {
 //        val idArray  = LongArray(studentItems.size)
@@ -496,44 +528,60 @@ class StudentFragment : Fragment() {
 //    }
 
     /**Bấm giữ item để Delete hoặc Update Student*/
-//    override fun onContextItemSelected(item: MenuItem): Boolean {
-//        when(item.itemId){
-//            0 -> showUpdateStudentDialog(item.groupId)
-//            1 -> showComfirmDialog(item.groupId)
-//        }
-//        return super.onContextItemSelected(item)
-//    }
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        if (role != "USER") {
+            when (item.itemId) {
+                0 -> showUpdateStudentDialog(item.groupId)
+                1 -> showComfirmDialog(item.groupId)
+            }
+        }
 
-//    private fun showUpdateStudentDialog(position: Int) {
-//        val dialog = MyDialog(studentItems.get(position).roll,studentItems.get(position).name)
-//        dialog.show(parentFragmentManager, MyDialog.STUDENT_UPDATE_DIALOG)
-//        dialog.onItemStudentClick = {
-//            it.name?.let { it1 -> updateStudent(position,it.roll!!, it1) }
-//        }
-//    }
+        return true
+    }
 
-//    private fun updateStudent(position: Int, roll: Int,name: String) {
-//        dbHelper.updateStudent(studentItems.get(position).sid!!,roll, name)
-//        studentItems.get(position).roll = roll
-//        studentItems.get(position).name = name
-//        studentAdapter.notifyItemChanged(position)
-//        Toast.makeText(requireContext(),"Update Success", Toast.LENGTH_SHORT).show()
-//    }
+    private fun showUpdateStudentDialog(position: Int) {
+        val dialog = MyDialog(studentItems.get(position).roll,studentItems.get(position).name)
+        dialog.show(parentFragmentManager, MyDialog.STUDENT_UPDATE_DIALOG)
+        dialog.onItemStudentClick = {
+            it.name?.let { it1 -> updateStudent(position,it.roll!!, it1) }
+        }
+    }
+
+    private fun updateStudent(position: Int, roll: Int,name: String) {
+        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        val studentsRef = databaseReference.child(keyCid!!).child("students").child(studentItems[position].sid.toString())
+
+        studentsRef.child("roll").setValue(roll).addOnCompleteListener {
+            Toast.makeText(requireContext(), "Update Success", Toast.LENGTH_SHORT).show()
+        }
+        studentsRef.child("name").setValue(name).addOnCompleteListener {
+            Toast.makeText(requireContext(), "Update Success", Toast.LENGTH_SHORT).show()
+        }
+        loadData()
+
+    }
 //
-//    private fun showComfirmDialog(position: Int) {
-//        val dialog = MyDialog()
-//        dialog.show(parentFragmentManager, MyDialog.CONFIRM_DIALOG)
-//        dialog.confirmClick = {
-//            if (it){
-//                deleteStudent(position)
-//            }
-//        }
-//    }
-//
-//    private fun deleteStudent(position: Int) {
-//        dbHelper.deleteStudent(studentItems.get(position).sid!!)
-//        studentItems.removeAt(position)
-//        studentAdapter.notifyItemRemoved(position)
-//        loadData()
-//    }
+    private fun showComfirmDialog(position: Int) {
+        val dialog = MyDialog()
+        dialog.show(parentFragmentManager, MyDialog.CONFIRM_DIALOG)
+        dialog.confirmClick = {
+            if (it){
+                deleteStudent(position)
+            }
+        }
+    }
+    private fun deleteStudent(position: Int) {
+        val databaseReference = FirebaseDatabase.getInstance().getReference("classes")
+        val studentsRef = databaseReference.child(keyCid!!).child("students").child(studentItems[position].sid.toString())
+        studentsRef.removeValue().addOnCompleteListener {
+
+        }
+        loadData()
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        databaseReference.child(keyCid!!).child("status").setValue("false").addOnCompleteListener {
+            Toast.makeText(requireContext(), "Delete Success", Toast.LENGTH_SHORT).show()
+        }
+    }
 }

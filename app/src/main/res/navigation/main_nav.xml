@@ -53,6 +53,9 @@
             app:exitAnim="@anim/to_left"
             app:popEnterAnim="@anim/from_left"
             app:popExitAnim="@anim/to_right"/>
+        <action
+            android:id="@+id/action_studentFragment_to_storageFragment"
+            app:destination="@id/storageFragment" />
     </fragment>
     <fragment
         android:id="@+id/sheetListFragment"
@@ -96,5 +99,19 @@
             android:id="@+id/action_loginFragment_to_classFragment"
             app:destination="@id/classFragment" />
     </fragment>
+    <fragment
+        android:id="@+id/storageFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.StorageFragment"
+        android:label="fragment_storage"
+        tools:layout="@layout/fragment_storage" >
+        <action
+            android:id="@+id/action_storageFragment_to_historyFragment"
+            app:destination="@id/historyFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/historyFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.HistoryFragment"
+        android:label="fragment_history"
+        tools:layout="@layout/fragment_history" />
 
 </navigation>

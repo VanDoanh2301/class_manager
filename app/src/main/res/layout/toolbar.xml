@@ -14,8 +14,8 @@
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginRight="16dp">
-            
+            android:layout_marginRight="12dp">
+
             <ImageView
                 android:id="@+id/back"
                 android:layout_width="wrap_content"
@@ -66,6 +66,18 @@
                 tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck" />
 
             <ImageButton
+                android:id="@+id/logout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentRight="true"
+                android:layout_centerVertical="true"
+                android:background="@android:color/transparent"
+                android:src="@drawable/baseline_logout_24"
+                android:visibility="gone"
+                tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck"
+                app:tint="@color/white" />
+
+            <ImageButton
                 android:id="@+id/attendance"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -78,6 +90,30 @@
                 android:layout_toLeftOf="@+id/save"
                 tools:ignore="SpeakableTextPresentCheck,TouchTargetSizeCheck"
                 app:tint="@color/white" />
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cd_check"
+                android:layout_width="58dp"
+                android:layout_height="32dp"
+                android:layout_alignParentRight="true"
+                android:layout_centerVertical="true"
+                app:cardCornerRadius="8dp"
+                android:layout_toLeftOf="@+id/save"
+                android:visibility="gone"
+                >
+                <TextView
+                    android:id="@+id/check_ance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Storage"
+                    android:gravity="center"
+                    android:layout_gravity="center"
+                    android:textSize="12dp"
+                    android:textStyle="bold"
+                    tools:ignore="TextSizeCheck" />
+
+            </androidx.cardview.widget.CardView>
+
         </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
 
