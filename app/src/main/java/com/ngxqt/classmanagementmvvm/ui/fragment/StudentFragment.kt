@@ -580,8 +580,11 @@ class StudentFragment : Fragment() {
     }
     override fun onDestroy() {
         super.onDestroy()
-        databaseReference.child(keyCid!!).child("status").setValue("false").addOnCompleteListener {
-            Toast.makeText(requireContext(), "Delete Success", Toast.LENGTH_SHORT).show()
+        if(role == "TEACHER") {
+            databaseReference.child(keyCid!!).child("status").setValue("false")
+                .addOnCompleteListener {
+                    Toast.makeText(requireContext(), "Delete Success", Toast.LENGTH_SHORT).show()
+                }
         }
     }
 }
