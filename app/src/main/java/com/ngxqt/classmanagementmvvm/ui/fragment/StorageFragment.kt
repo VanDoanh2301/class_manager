@@ -39,6 +39,9 @@ class StorageFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        binding.toolbarStudent.back.setOnClickListener {
+            requireActivity().supportFragmentManager.popBackStack()
+        }
         val recy = binding.studentRecycler
         val keyCid = arguments?.getString("keyCid")
         binding.toolbarStudent.subtitleToolbar.visibility = View.GONE

@@ -80,10 +80,22 @@ class ClassFragment : Fragment() {
                 if (dataSnapshot.exists()) {
                     role = dataSnapshot.child("role").getValue(String::class.java)
                     binding.fabMain.visibility = View.VISIBLE
+                    if (role != "TEACHER") {
+                        binding.toolbarMain.subtitleToolbar.text = "Hello students"
+                    } else {
+                        binding.toolbarMain.subtitleToolbar.text = "Hello teacher"
+
+                    }
 
                 } else {
                     binding.fabMain.visibility = View.GONE
                     role = "USER"
+                    if (role != "TEACHER") {
+                        binding.toolbarMain.subtitleToolbar.text = "Hello students"
+                    } else {
+                        binding.toolbarMain.subtitleToolbar.text = "Hello teacher"
+
+                    }
                 }
             }
 
@@ -115,11 +127,7 @@ class ClassFragment : Fragment() {
             navController.popBackStack(R.id.classFragment, true)
             navController.navigate(R.id.loginFragment)
         }
-        if (role == "TEACHER") {
-            binding.toolbarMain.subtitleToolbar.text = "Hello teacher"
-        } else {
-            binding.toolbarMain.subtitleToolbar.text = "Hello students"
-        }
+
     }
 
     private fun loadData() {

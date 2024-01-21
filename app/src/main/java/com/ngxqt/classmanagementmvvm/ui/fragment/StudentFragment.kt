@@ -1,6 +1,10 @@
 package com.ngxqt.classmanagementmvvm.ui.fragment
 
+import android.app.AlertDialog
 import android.content.ContentValues
+import android.content.Intent
+import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
@@ -8,7 +12,12 @@ import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.ImageView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
@@ -19,11 +28,18 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.GenericTypeIndicator
 import com.google.firebase.database.ValueEventListener
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.WriterException
+import com.google.zxing.common.BitMatrix
+import com.google.zxing.integration.android.IntentIntegrator
+import com.google.zxing.integration.android.IntentResult
 import com.ngxqt.classmanagementmvvm.R
 import com.ngxqt.classmanagementmvvm.data.dto.StudentDto
 import com.ngxqt.classmanagementmvvm.data.model.Attendance
 import com.ngxqt.classmanagementmvvm.data.model.StudentItem
 import com.ngxqt.classmanagementmvvm.databinding.FragmentStudentBinding
+import com.ngxqt.classmanagementmvvm.ui.MainActivity
 import com.ngxqt.classmanagementmvvm.ui.adapter.StudentAdapter
 import com.ngxqt.classmanagementmvvm.ui.adapter.StudentAttendanceAdapter
 import com.ngxqt.classmanagementmvvm.ui.dialog.MyCalendar
@@ -34,6 +50,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 
@@ -71,6 +88,7 @@ class StudentFragment : Fragment() {
         return view
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         calendar = MyCalendar()
@@ -94,6 +112,7 @@ class StudentFragment : Fragment() {
             binding.toolbarStudent.cdCheck.visibility = View.VISIBLE
         }
         setToolbar()
+        scanQr()
 //        setBottom()
 
         /**Cài đặt RecyclerView và Adapter để hiển thị item*/
@@ -398,17 +417,6 @@ class StudentFragment : Fragment() {
     }
 
 
-//    private fun saveStatus() {
-//        for (studentItem: StudentItem in studentItems){
-//            val status = studentItem.status
-//
-//            Log.i("LOG_VALUE","${studentItem.sid!!} + $cid + ${calendar.getDate()} + $status")
-//            val value = dbHelper.addStatus(studentItem.sid!!,cid!!,calendar.getDate(),status)
-//            //Log.i("LOG_VALUE",value.toString())
-//            if (value==-1L){ dbHelper.updateStatus(studentItem.sid!!,calendar.getDate(),status) }
-//            Log.i("TAG","SAVE_STATUS")
-//        }
-//    }
 
 
     private fun setAttendanceBottom(){
@@ -432,24 +440,83 @@ class StudentFragment : Fragment() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private fun setToolbar() {
         binding.toolbarStudent.apply {
-//            titleToolbar.setText(className)
-//            subtitleToolbar.setText(subjectName+" | "+calendar.getDate())
             back.setOnClickListener { requireActivity().onBackPressed() }
             save.setOnClickListener {
                 Toast.makeText(requireContext(), "Saved", Toast.LENGTH_SHORT).show()
             }
             toolbar.inflateMenu(R.menu.student_menu)
+
             toolbar.setOnMenuItemClickListener {
                 when (it.itemId) {
                     R.id.add_student -> showAddStudentDialog()
                     R.id.show_Calendar -> showCalendar()
                   R.id.show_attendance_sheet -> gotoStorage()
+                    R.id.create_qr -> gotoQR()
                 }
                 true
             }
+            val overflowIcon = toolbar.overflowIcon
+            overflowIcon?.let {
+                DrawableCompat.setTint(it, ContextCompat.getColor(requireContext(), R.color.white))
+            }
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun showQRDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.fragment_generate_qr, null)
+        val dialogBuilder = AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setPositiveButton("OK") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .create()
+        val bntGen = dialogView.findViewById<Button>(R.id.generateButton)
+
+        bntGen.setOnClickListener {
+            val qrData = "Attendance ${LocalDate.now()}"
+            try {
+                // Tạo BitMatrix từ dữ liệu QR
+                val bitMatrix: BitMatrix = MultiFormatWriter().encode(
+                    qrData,
+                    BarcodeFormat.QR_CODE,
+                    500,
+                    500
+                )
+
+                // Tạo Bitmap từ BitMatrix
+                val width = bitMatrix.width
+                val height = bitMatrix.height
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+                for (x in 0 until width) {
+                    for (y in 0 until height) {
+                        bitmap.setPixel(
+                            x,
+                            y,
+                            if (bitMatrix[x, y]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+                        )
+                    }
+                }
+
+                // Hiển thị Bitmap trong ImageView
+                dialogView.findViewById<ImageView>(R.id.qrImageView).setImageBitmap(bitmap)
+
+            } catch (e: WriterException) {
+                e.printStackTrace()
+            }
+
+        }
+
+        dialogBuilder.show()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun gotoQR() {
+      showQRDialog()
     }
 
     /**Chọn Menu*/
@@ -502,33 +569,11 @@ class StudentFragment : Fragment() {
         })
         loadData()
     }
-//
-//    private fun openSheetList() {
-//        val idArray  = LongArray(studentItems.size)
-//        val rollArray = IntArray(studentItems.size)
-//        val nameArray = Array<String?>(studentItems.size){null}
-//        for (i in idArray.indices){
-//            idArray[i] = studentItems.get(i).sid!!
-//        }
-//        for (i in rollArray.indices){
-//            rollArray[i] = studentItems.get(i).roll!!
-//        }
-//        for (i in nameArray.indices){
-//            nameArray[i] = studentItems.get(i).name
-//        }
-//        val bundle = bundleOf(
-//            "cid" to cid,
-//            "idArray" to idArray,
-//            "rollArray" to rollArray,
-//            "nameArray" to nameArray,
-//            "className" to className,
-//            "subjectName" to subjectName
-//        )
-//        findNavController().navigate(R.id.action_studentFragment_to_sheetListFragment,bundle)
-//    }
+
 
     /**Bấm giữ item để Delete hoặc Update Student*/
     override fun onContextItemSelected(item: MenuItem): Boolean {
+
         if (role != "USER") {
             when (item.itemId) {
                 0 -> showUpdateStudentDialog(item.groupId)
@@ -560,7 +605,7 @@ class StudentFragment : Fragment() {
         loadData()
 
     }
-//
+
     private fun showComfirmDialog(position: Int) {
         val dialog = MyDialog()
         dialog.show(parentFragmentManager, MyDialog.CONFIRM_DIALOG)
@@ -578,6 +623,13 @@ class StudentFragment : Fragment() {
         }
         loadData()
     }
+
+
+    private fun scanQr() {
+        binding.scanQr.setOnClickListener {
+            startQRScan()
+        }
+    }
     override fun onDestroy() {
         super.onDestroy()
         if(role == "TEACHER") {
@@ -585,6 +637,27 @@ class StudentFragment : Fragment() {
                 .addOnCompleteListener {
                     Toast.makeText(requireContext(), "Delete Success", Toast.LENGTH_SHORT).show()
                 }
+        }
+    }
+
+    private fun startQRScan() {
+        val integrator = IntentIntegrator.forSupportFragment(this)
+        integrator.setOrientationLocked(false)
+        integrator.initiateScan()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val result: IntentResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
+        if (result.contents != null) {
+            val qrData = result.contents
+            if (qrData.equals("Attendance ${LocalDate.now()}")) {
+                binding.toolbarStudent.attendance.performClick()
+            }
+
+        } else {
+
         }
     }
 }

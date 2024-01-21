@@ -56,6 +56,9 @@
         <action
             android:id="@+id/action_studentFragment_to_storageFragment"
             app:destination="@id/storageFragment" />
+        <action
+            android:id="@+id/action_studentFragment_to_generateQRFragment"
+            app:destination="@id/generateQRFragment" />
     </fragment>
     <fragment
         android:id="@+id/sheetListFragment"
@@ -86,11 +89,6 @@
         android:label="fragment_map"
         tools:layout="@layout/fragment_map" />
     <fragment
-        android:id="@+id/blankFragment"
-        android:name="com.ngxqt.classmanagementmvvm.BlankFragment"
-        android:label="fragment_blank"
-        tools:layout="@layout/fragment_blank" />
-    <fragment
         android:id="@+id/loginFragment"
         android:name="com.ngxqt.classmanagementmvvm.ui.fragment.LoginFragment"
         android:label="fragment_login"
@@ -113,5 +111,9 @@
         android:name="com.ngxqt.classmanagementmvvm.ui.fragment.HistoryFragment"
         android:label="fragment_history"
         tools:layout="@layout/fragment_history" />
+    <fragment
+        android:id="@+id/generateQRFragment"
+        android:name="com.ngxqt.classmanagementmvvm.ui.fragment.GenerateQRFragment"
+        android:label="GenerateQRFragment" />
 
 </navigation>

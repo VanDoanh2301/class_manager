@@ -9,5 +9,8 @@
     <item
         android:id="@+id/show_attendance_sheet"
         android:title="Attendance Sheet"/>
+    <item
+        android:id="@+id/create_qr"
+        android:title="QR Code"/>
 
 </menu>
